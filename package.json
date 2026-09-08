@@ -1,0 +1,19 @@
+{
+  "name": "yaml-config-linter",
+  "version": "0.1.0",
+  "description": "A dependency-free linter for YAML config files that reports findings with line numbers.",
+  "type": "module",
+  "main": "dist/linter.js",
+  "bin": {
+    "yaml-config-linter": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js"
+  },
+  "license": "MIT",
+  "author": "amoore744",
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}
