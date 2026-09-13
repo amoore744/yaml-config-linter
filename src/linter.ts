@@ -15,9 +15,9 @@ const DEFAULT_OPTIONS: LintOptions = {
   maxLineLength: 120,
 };
 
-// Matches "key:" or "key: value" at the start of a line, ignoring leading
-// whitespace. Deliberately does not try to handle flow mappings ({ a: 1 })
-// or sequence-item keys ("- a: 1") yet — see README for known limitations.
+// Matches "key:" or "key: value" once any leading whitespace and sequence
+// dashes have already been stripped from the input. Deliberately does not
+// try to handle flow mappings ({ a: 1 }) — see README for known limitations.
 const KEY_PATTERN = /^(\s*)([^\s#:][^:]*?):(\s|$)/;
 
 interface Frame {
@@ -49,18 +49,51 @@ export function lintYaml(source: string, options: Partial<LintOptions> = {}): Fi
       return;
     }
 
-    const match = KEY_PATTERN.exec(line);
+    const leading = /^(\s*)/.exec(line)?.[1] ?? "";
+    let indent = leading.length;
+    let content = line.slice(indent);
+    let isSequenceItem = false;
+
+    // Peel off one or more "- " sequence markers ("- - a: 1" for a list of
+    // lists), tracking indent as the column where the mapping content
+    // actually starts rather than where the dash sits.
+    while (content === "-" || /^-\s/.test(content)) {
+      isSequenceItem = true;
+      while (stack.length && stack[stack.length - 1].indent > indent) {
+        stack.pop();
+      }
+      let consumed = 1;
+      while (content[consumed] === " ") {
+        consumed++;
+      }
+      indent += consumed;
+      content = content.slice(consumed);
+    }
+
+    if (isSequenceItem) {
+      // Every "- " starts a new mapping, even one that lands at the same
+      // indent as a sibling item's leftover frame, so discard it here
+      // instead of reusing it.
+      while (stack.length && stack[stack.length - 1].indent >= indent) {
+        stack.pop();
+      }
+    } else {
+      // Pop back to the frame that owns this indent level.
+      while (stack.length && stack[stack.length - 1].indent > indent) {
+        stack.pop();
+      }
+    }
+
+    if (content.trim() === "") {
+      return;
+    }
+
+    const match = KEY_PATTERN.exec(content);
     if (!match) {
       return;
     }
 
-    const indent = match[1].length;
     const key = match[2].trim();
-
-    // Pop back to the frame that owns this indent level.
-    while (stack.length && stack[stack.length - 1].indent > indent) {
-      stack.pop();
-    }
 
     let frame = stack[stack.length - 1];
     let isNewFrame = false;

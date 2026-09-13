@@ -69,11 +69,15 @@ used as a CI gate.
 This is a line-based checker, not a YAML parser, so it currently does
 not understand:
 
-- keys inside sequence items (`- name: foo`)
 - flow-style mappings (`{ a: 1, b: 2 }`)
 - multi-line scalars (`|` and `>` blocks) — content inside them is
   checked for tabs/whitespace/length like any other line, which can
   produce noise if a block scalar legitimately contains a tab
+
+Keys inside sequence items (`- name: foo`) are handled: each `- `
+starts a fresh mapping, so a `name` key repeated across list items is
+not flagged as a duplicate, but a real duplicate within one item still
+is.
 
 ## License
 
