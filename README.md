@@ -67,12 +67,12 @@ used as a CI gate.
 ## Known limitations
 
 This is a line-based checker, not a YAML parser, so it currently does
-not understand:
+not understand flow-style mappings (`{ a: 1, b: 2 }`).
 
-- flow-style mappings (`{ a: 1, b: 2 }`)
-- multi-line scalars (`|` and `>` blocks) — content inside them is
-  checked for tabs/whitespace/length like any other line, which can
-  produce noise if a block scalar legitimately contains a tab
+Block scalars (`|` and `>`, including their chomping and explicit
+indentation variants like `|-` or `>2`) are recognized: once a line
+introduces one, its body is treated as opaque text and skipped by every
+check until a line returns to or below the introducing line's indent.
 
 Keys inside sequence items (`- name: foo`) are handled: each `- `
 starts a fresh mapping, so a `name` key repeated across list items is

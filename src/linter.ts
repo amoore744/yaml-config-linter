@@ -20,9 +20,24 @@ const DEFAULT_OPTIONS: LintOptions = {
 // try to handle flow mappings ({ a: 1 }) — see README for known limitations.
 const KEY_PATTERN = /^(\s*)([^\s#:][^:]*?):(\s|$)/;
 
+// A block scalar indicator ("|", ">") with an optional chomping indicator
+// ("+", "-") and an optional explicit indentation indicator digit, in
+// either order (both "|2-" and "|-2" are valid YAML).
+const BLOCK_SCALAR_PATTERN = /^[|>][0-9+-]{0,2}$/;
+
 interface Frame {
   indent: number;
   keys: Set<string>;
+}
+
+interface BlockScalar {
+  // Body lines must be indented more than the line that introduced the
+  // scalar; anything at or below that indent ends it.
+  indent: number;
+}
+
+function stripComment(value: string): string {
+  return value.replace(/\s+#.*$/, "").trim();
 }
 
 export function lintYaml(source: string, options: Partial<LintOptions> = {}): Finding[] {
@@ -30,6 +45,7 @@ export function lintYaml(source: string, options: Partial<LintOptions> = {}): Fi
   const findings: Finding[] = [];
   const lines = source.split(/\r\n|\n/);
   const stack: Frame[] = [];
+  let blockScalar: BlockScalar | null = null;
 
   lines.forEach((line, index) => {
     const lineNo = index + 1;
@@ -37,7 +53,18 @@ export function lintYaml(source: string, options: Partial<LintOptions> = {}): Fi
     // A document separator starts a fresh mapping scope.
     if (line.trim() === "---") {
       stack.length = 0;
+      blockScalar = null;
       return;
+    }
+
+    if (blockScalar) {
+      const leadingLen = /^[ \t]*/.exec(line)?.[0].length ?? 0;
+      if (line.trim() === "" || leadingLen > blockScalar.indent) {
+        // Still inside the scalar body; its content is a literal string,
+        // not YAML structure, so none of the usual checks apply to it.
+        return;
+      }
+      blockScalar = null;
     }
 
     checkTabs(line, lineNo, findings);
@@ -53,12 +80,18 @@ export function lintYaml(source: string, options: Partial<LintOptions> = {}): Fi
     let indent = leading.length;
     let content = line.slice(indent);
     let isSequenceItem = false;
+    // Indent of the innermost "-" itself, as opposed to `indent`, which
+    // ends up at the column where the item's content starts. They only
+    // diverge for a sequence item, and it's the dash's column that a bare
+    // scalar item's block scalar body must be indented past.
+    let itemIndent = indent;
 
     // Peel off one or more "- " sequence markers ("- - a: 1" for a list of
     // lists), tracking indent as the column where the mapping content
     // actually starts rather than where the dash sits.
     while (content === "-" || /^-\s/.test(content)) {
       isSequenceItem = true;
+      itemIndent = indent;
       while (stack.length && stack[stack.length - 1].indent > indent) {
         stack.pop();
       }
@@ -90,10 +123,18 @@ export function lintYaml(source: string, options: Partial<LintOptions> = {}): Fi
 
     const match = KEY_PATTERN.exec(content);
     if (!match) {
+      if (BLOCK_SCALAR_PATTERN.test(stripComment(content))) {
+        // A sequence item that is itself a block scalar, e.g. "- |".
+        blockScalar = { indent: itemIndent };
+      }
       return;
     }
 
     const key = match[2].trim();
+    const value = stripComment(content.slice(match[0].length));
+    if (BLOCK_SCALAR_PATTERN.test(value)) {
+      blockScalar = { indent };
+    }
 
     let frame = stack[stack.length - 1];
     let isNewFrame = false;
