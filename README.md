@@ -54,6 +54,26 @@ config.yaml:5: [error] tab used for indentation; YAML indentation must use space
 Exit code is `1` if any finding is an error, `0` otherwise, so it can be
 used as a CI gate.
 
+Pass `--format json` to get findings as a JSON array instead, one object
+per finding with a `file` field added, useful for feeding into another
+tool:
+
+```sh
+node dist/cli.js --format json config.yaml
+```
+
+```json
+[
+  {
+    "file": "config.yaml",
+    "line": 3,
+    "rule": "duplicate-key",
+    "severity": "error",
+    "message": "duplicate key \"name\" at this indentation level"
+  }
+]
+```
+
 ## Rules
 
 | rule | severity | what it catches |
