@@ -74,6 +74,25 @@ node dist/cli.js --format json config.yaml
 ]
 ```
 
+## Config file
+
+By default the linter looks for `.yaml-lint.json` in the current
+directory and applies it if present. Use `--config <path>` to point at
+a different file instead; when given explicitly, that path must exist.
+
+```json
+{
+  "maxLineLength": 100,
+  "rules": {
+    "line-length": false
+  }
+}
+```
+
+`maxLineLength` overrides the default of 120. `rules` takes a rule name
+to `false` to turn it off entirely; rules not listed stay on. There's no
+way to change a rule's severity — only whether it runs.
+
 ## Rules
 
 | rule | severity | what it catches |

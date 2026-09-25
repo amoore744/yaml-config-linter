@@ -9,10 +9,13 @@ export interface Finding {
 
 export interface LintOptions {
   maxLineLength: number;
+  // Rule names to skip entirely, e.g. from a project's config file.
+  disabledRules: ReadonlySet<string>;
 }
 
 const DEFAULT_OPTIONS: LintOptions = {
   maxLineLength: 120,
+  disabledRules: new Set(),
 };
 
 // Matches "key:" or "key: value" once any leading whitespace and sequence
@@ -160,7 +163,9 @@ export function lintYaml(source: string, options: Partial<LintOptions> = {}): Fi
     }
   });
 
-  return findings.sort((a, b) => a.line - b.line);
+  return findings
+    .filter((finding) => !opts.disabledRules.has(finding.rule))
+    .sort((a, b) => a.line - b.line);
 }
 
 function checkTabs(line: string, lineNo: number, findings: Finding[]): void {
